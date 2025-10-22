@@ -1,0 +1,90 @@
+---
+/**
+ * NoteEditorModal.astro - Accessible modal for creating/editing notes
+ */
+type Note = {
+  id: string;
+  title: string;
+  content: string;
+  updatedAt: number;
+};
+const { open = false, note = null } = Astro.props as { open: boolean; note: Note | null };
+---
+<div id="modal-backdrop" class={"modal-backdrop" + (open ? " open" : "")} aria-hidden={!open} aria-modal="true" role="dialog" aria-label="Note editor">
+  <div id="modal" class={"modal" + (open ? " open" : "")}>
+    <div class="modal-header">
+      <h3 class="modal-title">{note ? "Edit Note" : "New Note"}</h3>
+      <div class="flex gap-8">
+        {note && <span class="note-meta">Last edit: {new Date(note.updatedAt).toLocaleString()}</span>}
+        <button id="close-modal" class="btn" aria-label="Close editor">Close</button>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="space-y-12">
+        <div>
+          <label for="title" class="section-title">Title</label>
+          <input id="title" class="input" placeholder="Note title" value={note?.title || ""} />
+        </div>
+        <div>
+          <label for="content" class="section-title">Content</label>
+          <textarea id="content" class="textarea" placeholder="Write your note...">{note?.content || ""}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="text-muted" aria-live="polite">Press Esc to close</div>
+      <div class="flex gap-8">
+        <button id="save-note" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Focus trap and keyboard handling
+  const backdrop = document.getElementById('modal-backdrop');
+  const modal = document.getElementById('modal');
+  const btnClose = document.getElementById('close-modal');
+  const btnSave = document.getElementById('save-note');
+
+  function dispatch(name, detail) {
+    window.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+
+  function close() { dispatch('modal:close', {}); }
+  function save() {
+    const titleInput = document.getElementById('title');
+    const contentInput = document.getElementById('content');
+    const title = titleInput && 'value' in titleInput ? titleInput.value : '';
+    const content = contentInput && 'value' in contentInput ? contentInput.value : '';
+    dispatch('modal:save', { title, content });
+  }
+
+  if (btnClose) btnClose.addEventListener('click', close);
+  if (btnSave) btnSave.addEventListener('click', save);
+
+  if (backdrop) {
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) close();
+    });
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && backdrop && backdrop.classList.contains('open')) {
+      e.preventDefault();
+      close();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's' && backdrop && backdrop.classList.contains('open')) {
+      e.preventDefault();
+      save();
+    }
+  });
+
+  // Auto-focus title on open
+  setTimeout(() => {
+    if (backdrop && backdrop.classList.contains('open')) {
+      const titleInput = document.getElementById('title');
+      if (titleInput && 'focus' in titleInput) titleInput.focus();
+    }
+  }, 50);
+</script>

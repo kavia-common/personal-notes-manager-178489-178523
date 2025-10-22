@@ -1,0 +1,31 @@
+---
+/**
+ * Sidebar.astro - Static sidebar for navigation and tips
+ */
+---
+<aside class="sidebar" aria-label="Sidebar">
+  <div class="card-section">
+    <div class="gradient-accent card-section">
+      <h3 class="section-title" style="margin-bottom:6px">Quick Tips</h3>
+      <ul style="padding-left:18px; margin:0; color:var(--muted-text); font-size:13px;">
+        <li>Press <kbd>/</kbd> to search notes</li>
+        <li>Click a note to edit</li>
+        <li>Use the Add Note button to create</li>
+      </ul>
+    </div>
+
+    <div class="mt-16 card-section card">
+      <h3 class="section-title">Labels</h3>
+      <div class="flex gap-8" role="list">
+        <span class="badge" role="listitem">All</span>
+        <span class="badge" role="listitem">Work</span>
+        <span class="badge" role="listitem">Personal</span>
+      </div>
+    </div>
+
+    <div class="mt-16 card-section card">
+      <h3 class="section-title">Theme</h3>
+      <p class="text-muted" style="margin:0">Ocean Professional</p>
+    </div>
+  </div>
+</aside>

@@ -1,0 +1,63 @@
+---
+/**
+ * NotesList.astro - Renders a list of notes with click and delete actions
+ */
+type Note = {
+  id: string;
+  title: string;
+  content: string;
+  updatedAt: number;
+};
+
+const { notes = [] } = Astro.props as { notes: Note[] };
+---
+<div id="notes-list" class="space-y-12" role="list" aria-label="Notes list">
+  {notes.length === 0 ? (
+    <div class="card card-section" role="status" aria-live="polite">
+      <strong>No notes found.</strong>
+      <p class="text-muted" style="margin-top:6px">Create your first note to get started.</p>
+    </div>
+  ) : (
+    notes.map((n) => (
+      <div class="note-item" role="listitem" data-id={n.id}>
+        <div>
+          <h4 class="note-title">{n.title || 'Untitled'}</h4>
+          <div class="note-meta">
+            Updated {new Date(n.updatedAt).toLocaleString()}
+          </div>
+        </div>
+        <div class="note-actions">
+          <button class="btn" data-action="open" aria-label={`Open "${n.title || 'Untitled'}"`}>Open</button>
+          <button class="btn btn-danger" data-action="delete" aria-label={`Delete "${n.title || 'Untitled'}"`}>Delete</button>
+        </div>
+      </div>
+    ))
+  )}
+</div>
+
+<script>
+  // Event delegation for open/delete actions
+  const root = document.getElementById('notes-list');
+  function send(name, detail) {
+    window.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+  if (root) {
+    root.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!target || !(target instanceof HTMLElement)) return;
+      const item = target.closest('[data-id]');
+      if (!item) return;
+      const id = item.getAttribute('data-id');
+      const action = target.getAttribute('data-action') || (target.closest('[data-action]') && target.closest('[data-action]').getAttribute('data-action'));
+
+      if (action === 'open') {
+        send('notes:open', { id });
+      } else if (action === 'delete') {
+        send('notes:delete', { id });
+      } else if (target === item) {
+        // click row to open
+        send('notes:open', { id });
+      }
+    });
+  }
+</script>

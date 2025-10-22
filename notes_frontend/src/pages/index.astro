@@ -1,11 +1,206 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+import Header from '../components/Header.astro';
+import Sidebar from '../components/Sidebar.astro';
+import NotesList from '../components/NotesList.astro';
+import "../styles/theme.css";
 ---
 
 <Layout>
-	<Welcome />
+  <Header />
+  <div class="container">
+    <Sidebar />
+    <main class="main">
+      <section class="card card-section">
+        <h2 class="section-title">Your Notes</h2>
+        <div id="notes-host"></div>
+      </section>
+    </main>
+  </div>
 </Layout>
+
+<script type="module">
+  import { loadNotes, createNote, updateNote, deleteNote, searchNotes } from '../lib/storage.ts';
+
+  let state = {
+    notes: [],
+    selectedId: null,
+    query: '',
+    modalOpen: false,
+    draft: null,
+  };
+
+  const notesHost = document.getElementById('notes-host');
+
+  function renderList() {
+    const filtered = state.query ? searchNotes(state.query) : loadNotes();
+    state.notes = filtered;
+
+    notesHost.innerHTML = filtered.length
+      ? filtered.map(n => `
+        <div class="note-item" role="listitem" data-id="${n.id}">
+          <div>
+            <h4 class="note-title">${n.title ? escapeHtml(n.title) : 'Untitled'}</h4>
+            <div class="note-meta">Updated ${new Date(n.updatedAt).toLocaleString()}</div>
+          </div>
+          <div class="note-actions">
+            <button class="btn" data-action="open" aria-label="Open ${n.title || 'Untitled'}">Open</button>
+            <button class="btn btn-danger" data-action="delete" aria-label="Delete ${n.title || 'Untitled'}">Delete</button>
+          </div>
+        </div>
+      `).join('')
+      : `
+        <div class="card card-section" role="status" aria-live="polite">
+          <strong>No notes found.</strong>
+          <p class="text-muted" style="margin-top:6px">Create your first note to get started.</p>
+        </div>
+      `;
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/[&<>"']/g, function(m) {
+      return {
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[m];
+    });
+  }
+
+  // Modal management
+  let modalEl;
+  function openModal(note) {
+    if (note === undefined) note = null;
+    state.modalOpen = true;
+    state.draft = note ? Object.assign({}, note) : { id: null, title: '', content: '' };
+    ensureModal();
+    renderModal();
+  }
+  function closeModal() {
+    state.modalOpen = false;
+    if (modalEl) {
+      modalEl.remove();
+      modalEl = null;
+    }
+  }
+  function ensureModal() {
+    if (!modalEl) {
+      modalEl = document.createElement('div');
+      modalEl.id = 'modal-container';
+      document.body.appendChild(modalEl);
+    }
+  }
+  function renderModal() {
+    const n = state.draft || { title:'', content:'' };
+    modalEl.innerHTML = `
+      <div class="modal-backdrop open" id="modal-backdrop" aria-hidden="false" aria-modal="true" role="dialog" aria-label="Note editor">
+        <div class="modal open" id="modal">
+          <div class="modal-header">
+            <h3 class="modal-title">${n.id ? 'Edit Note' : 'New Note'}</h3>
+            <div class="flex gap-8">
+              ${n.updatedAt ? `<span class="note-meta">Last edit: ${new Date(n.updatedAt).toLocaleString()}</span>` : ''}
+              <button id="close-modal" class="btn" aria-label="Close editor">Close</button>
+            </div>
+          </div>
+          <div class="card-section">
+            <div class="space-y-12">
+              <div>
+                <label for="title" class="section-title">Title</label>
+                <input id="title" class="input" placeholder="Note title" value="${escapeHtml(n.title || '')}" />
+              </div>
+              <div>
+                <label for="content" class="section-title">Content</label>
+                <textarea id="content" class="textarea" placeholder="Write your note...">${escapeHtml(n.content || '')}</textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <div class="text-muted" aria-live="polite">Press Esc to close • Ctrl/⌘+S to save</div>
+            <div class="flex gap-8">
+              <button id="save-note" class="btn btn-primary">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // events
+    const backdrop = modalEl.querySelector('#modal-backdrop');
+    const btnClose = modalEl.querySelector('#close-modal');
+    const btnSave = modalEl.querySelector('#save-note');
+    const inputTitle = modalEl.querySelector('#title');
+    const inputContent = modalEl.querySelector('#content');
+
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (btnSave) btnSave.addEventListener('click', saveDraft);
+    if (backdrop) backdrop.addEventListener('click', function(e) { if (e.target === backdrop) closeModal(); });
+    setTimeout(function() { if (inputTitle && 'focus' in inputTitle) inputTitle.focus(); }, 30);
+
+    function saveDraft() {
+      const title = inputTitle && 'value' in inputTitle ? inputTitle.value : '';
+      const content = inputContent && 'value' in inputContent ? inputContent.value : '';
+      if (n.id) {
+        updateNote(n.id, { title, content });
+      } else {
+        const created = createNote({ title, content });
+        state.selectedId = created.id;
+      }
+      renderList();
+      closeModal();
+    }
+
+    window.addEventListener('keydown', onKey);
+    function onKey(ev) {
+      if (!state.modalOpen) { window.removeEventListener('keydown', onKey); return; }
+      if (ev.key === 'Escape') { ev.preventDefault(); closeModal(); }
+      if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); if (btnSave) btnSave.dispatchEvent(new Event('click')); }
+    }
+  }
+
+  // Global events from Header and list
+  window.addEventListener('notes:add', function() { openModal(null); });
+  window.addEventListener('notes:search', function(e) {
+    const detail = e && e.detail ? e.detail : (e && e.originalEvent && e.originalEvent.detail ? e.originalEvent.detail : {});
+    state.query = (detail && detail.q) ? detail.q : '';
+    renderList();
+  });
+  notesHost.addEventListener('click', function(e) {
+    const target = e.target;
+    if (!target || !(target instanceof HTMLElement)) return;
+    const item = target.closest('[data-id]');
+    if (!item) return;
+    const id = item.getAttribute('data-id');
+    const action = target.getAttribute('data-action') || (target.closest('[data-action]') && target.closest('[data-action]').getAttribute('data-action'));
+    if (action === 'open') {
+      const current = loadNotes().find(n => n.id === id);
+      openModal(current || null);
+    } else if (action === 'delete') {
+      const current = loadNotes().find(n => n.id === id);
+      if (current) {
+        if (confirm(`Delete note "${current.title || 'Untitled'}"? This cannot be undone.`)) {
+          deleteNote(current.id);
+          renderList();
+        }
+      }
+    }
+  });
+
+  // Initial seed for empty state (optional, minimal)
+  (function seed() {
+    const existing = loadNotes();
+    if (existing.length === 0) {
+      createNote({ title: 'Welcome to Ocean Notes', content: 'Create, edit, and manage your notes. This app stores data locally in your browser using localStorage.' });
+      createNote({ title: 'Tips', content: 'Use the Add Note button to create new notes. Click a note to edit. Use the search box to filter.' });
+    }
+  })();
+
+  // Wire search and add buttons inside header (static markup) to dispatch custom events
+  const search = document.getElementById('global-search');
+  const addBtn = document.getElementById('add-note-btn');
+  function dispatch(name, detail) { window.dispatchEvent(new CustomEvent(name, { detail })); }
+  if (search) {
+    search.addEventListener('input', (e) => dispatch('notes:search', { q: e.target && 'value' in e.target ? e.target.value : '' }));
+    window.addEventListener('keydown', (e) => { if (e.key === '/' && document.activeElement !== search) { e.preventDefault(); search.focus(); } });
+  }
+  if (addBtn) { addBtn.addEventListener('click', () => dispatch('notes:add', {})); }
+
+  renderList();
+</script>

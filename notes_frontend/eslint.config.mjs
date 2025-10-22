@@ -4,6 +4,15 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default [
+  {
+    ignores: [
+      '.astro/**',
+      'dist/**',
+      '.vercel/**',
+      '.netlify/**'
+    ],
+  },
+
   js.configs.recommended,
 
   // TypeScript support
@@ -20,9 +29,12 @@ export default [
       },
     },
     rules: {
-      // Example custom rules for TS
       '@typescript-eslint/no-unused-vars': ['warn'],
       '@typescript-eslint/explicit-function-return-type': 'off',
+      // Generated types sometimes use `{}` and `any`
+      '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/triple-slash-reference': 'off',
     },
   },
 
@@ -41,6 +53,8 @@ export default [
       'no-unused-vars': 'warn',
       'no-console': 'off',
       'eqeqeq': ['error', 'always'],
+      'no-useless-escape': 'off',
+      'no-undef': 'off', // avoid flagging browser globals in built output
     },
   },
 ];
